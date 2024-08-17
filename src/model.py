@@ -2,7 +2,6 @@ import tqdm
 import time
 import cProfile
 import numpy as np
-from apex import amp
 
 import torch
 from torch import nn
@@ -242,6 +241,8 @@ class LightXML(nn.Module):
         pred_scores, pred_labels = [], []
         bar.set_description(f'{mode}-{epoch}')
 
+        scaler = torch.cuda.amp.GradScaler()
+
         with torch.set_grad_enabled(mode == 'train'):
             for step, data in enumerate(dataloader):
                 batch = tuple(t for t in data)
@@ -255,7 +256,8 @@ class LightXML(nn.Module):
                         inputs['group_labels'] = batch[4].cuda()
                         inputs['candidates'] = batch[5].cuda()
 
-                outputs = self(**inputs)
+                with torch.cuda.amp.autocast():
+                    outputs = self(**inputs)
 
                 bar.update(1)
 
@@ -264,11 +266,11 @@ class LightXML(nn.Module):
                     loss /= self.update_count
                     train_loss += loss.item()
 
-                    with amp.scale_loss(loss, optimizer) as scaled_loss:
-                        scaled_loss.backward()
+                    scaler.scale(loss).backward()
     
                     if step % self.update_count == 0:
-                        optimizer.step()
+                        scaler.step(optimizer)
+                        scaler.update()
                         self.zero_grad()
 
                     if step % eval_step == 0 and eval_loader is not None and step != 0:
@@ -325,7 +327,6 @@ class LightXML(nn.Module):
                         _labels = torch.stack([candidates[i][_indices[i]] for i in range(_indices.shape[0])], dim=0)
                         pred_scores.append(_scores.cpu())
                         pred_labels.append(_labels.cpu())
-
 
         if self.use_swa and mode == 'eval':
             self.swa_swap_params()
