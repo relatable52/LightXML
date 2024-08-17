@@ -199,7 +199,7 @@ class LightXML(nn.Module):
     def get_accuracy(self, candidates, logits, labels):
         if candidates is not None:
             candidates = candidates.detach().cpu()
-        scores, indices = torch.topk(logits.detach().cpu(), k=10)
+        scores, indices = torch.topk(logits.detach().cpu().float(), k=10)
 
         acc1, acc3, acc5, total = 0, 0, 0, 0
         for i, l in enumerate(labels):
@@ -302,7 +302,7 @@ class LightXML(nn.Module):
                         p5 = acc5 / total / 5
                         bar.set_postfix(p1=p1, p3=p3, p5=p5)
                     elif mode == 'test':
-                        pred_scores.append(logits.detach().cpu())
+                        pred_scores.append(logits.detach().cpu().float())
                 else:
                     group_logits, candidates, logits = outputs
 
@@ -323,7 +323,7 @@ class LightXML(nn.Module):
                         g_p5 = g_acc5 / total / 5
                         bar.set_postfix(p1=p1, p3=p3, p5=p5, g_p1=g_p1, g_p3=g_p3, g_p5=g_p5)
                     elif mode == 'test':
-                        _scores, _indices = torch.topk(logits.detach().cpu(), k=100)
+                        _scores, _indices = torch.topk(logits.detach().cpu().float(), k=100)
                         _labels = torch.stack([candidates[i][_indices[i]] for i in range(_indices.shape[0])], dim=0)
                         pred_scores.append(_scores.cpu())
                         pred_labels.append(_labels.cpu())
